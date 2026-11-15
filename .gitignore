@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+.DS_Store
+.pi/
+.env
+.env.*
+!.env.example

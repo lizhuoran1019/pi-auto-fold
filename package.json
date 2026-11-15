@@ -1,0 +1,27 @@
+{
+  "name": "pi-auto-fold",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Collapse completed execution history into expandable summaries in the Pi terminal UI.",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lizhuoran1019/pi-auto-fold.git"
+  },
+  "scripts": {
+    "test": "node --test test/auto-fold.test.mjs",
+    "test:tui": "python3 test/tui-smoke.py"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
