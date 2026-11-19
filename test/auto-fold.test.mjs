@@ -197,10 +197,19 @@ test("real host components expose the guarded metadata and retain their native r
 	assert.equal(inspectRow(tool).kind, "boundary");
 });
 
-const delegateNotice = (status = "completed", id = "del_smoke_1") =>
-	`[acp_delegate ${status}] **researcher** (runId \`${id}\`, exit ${status === "completed" ? 0 : 1}) No delegates are currently running.\n\n`
+const delegateNotice = (status = "completed", id = "del_smoke_1", exit = status === "completed" ? 0 : 1) =>
+	`[acp_delegate ${status}] **researcher** (runId \`${id}\`, exit ${exit}) No delegates are currently running.\n\n`
 	+ "This is an automated system notification, NOT a user message.\n\nTask: Investigate a fixture\n\n"
 	+ `Full result: \`/tmp/acp-delegate/${id}.out\`\n(use the \`read\` tool to open it if you need the details)\n`;
+
+test("ACP exit labels describe process termination, not the delegate outcome", () => {
+	for (const status of ["completed", "FAILED ⚠️"]) {
+		for (const exit of [0, 1, -1, "SIGTERM", "SIGKILL", "?"]) {
+			const row = new host.UserMessageComponent(delegateNotice(status, "del_smoke_1", exit));
+			assert.deepEqual(inspectRow(row), { kind: "notice", meaningful: true, failed: status !== "completed" });
+		}
+	}
+});
 
 test("persisted delegate notifications do not split a completed execution group", () => {
 	const ui = fakeUi();
@@ -228,8 +237,8 @@ test("persisted delegate notifications do not split a completed execution group"
 });
 
 test("user questions quoting notification headings remain real boundaries", () => {
-	const full = delegateNotice();
-	for (const text of [full.split("\n")[0], `请解释：${full}`, `${full}我该怎么办？`,
+	const full = delegateNotice("completed", "del_smoke_1", "SIGTERM");
+	for (const text of [full.replace("exit SIGTERM", "exit unknown reason"), full.split("\n")[0], `请解释：${full}`, `${full}我该怎么办？`,
 		full.replace("/del_smoke_1.out", "/del_another_run.out"), "[acp_delegate completed] hello"]) {
 		assert.equal(inspectRow(new host.UserMessageComponent(text)).kind, "boundary");
 	}

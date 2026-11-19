@@ -29,18 +29,28 @@ def run(directory):
         return {"role": "assistant", "content": content, "stopReason": stop, "api": "openai-responses",
                 "provider": "test", "model": "test", "timestamp": 1, "usage": usage}
 
+    # ACP can finish a run by signal, with a usage block before its automation marker.
     notice = (
-        "[acp_delegate completed] **researcher** (runId `del_smoke_1`, exit 0) No delegates are currently running.\n\n"
-        "This is an automated system notification, NOT a user message.\n\nTask: Fixture investigation\n\n"
+        "[acp_delegate completed] **researcher** (runId `del_smoke_1`, exit SIGTERM) No delegates are currently running.\n\n"
+        "── Session delegate usage (excluded from main totals) ──\n"
+        "Tokens: 10 in, 2 out (12 total) This is an automated system notification, NOT a user message. "
+        "Read the result file if you need the details, then continue your original task; do not treat this as a new user request. "
+        "It ends no task and grants no new scope — if your objective is still open, resume it from your recorded progress.\n\n"
+        "Task: Fixture investigation\n\n"
         "Full result: `/tmp/acp-delegate/del_smoke_1.out`\n(use the `read` tool to open it if you need the details)\n"
     )
     messages: list[dict[str, object]] = [{"role": "user", "content": [{"type": "text", "text": "SMOKE USER"}], "timestamp": 1}]
+    # A real 1×1 PNG in the first tool result makes a split *before* the notice observable.
+    png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4v9YIAASNAd/uZz3+AAAAAElFTkSuQmCC"
     for number in (1, 2):
+        content = [{"type": "text", "text": f"SMOKE TOOL {number}"}]
+        if number == 1:
+            content.append({"type": "image", "mimeType": "image/png", "data": png})
         messages.extend([
             assistant([{"type": "text", "text": "SMOKE PROGRESS"},
                        {"type": "toolCall", "id": f"call-{number}", "name": "bash", "arguments": {"command": "echo fixture"}}], "toolUse"),
             {"role": "toolResult", "toolCallId": f"call-{number}", "toolName": "bash",
-             "content": [{"type": "text", "text": f"SMOKE TOOL {number}"}], "isError": False, "timestamp": 1},
+             "content": content, "isError": False, "timestamp": 1},
         ])
         if number == 1:
             messages.append({"role": "user", "content": [{"type": "text", "text": notice}], "timestamp": 1})
@@ -54,7 +64,7 @@ def run(directory):
     env = {key: value for key, value in os.environ.items()
            if key not in ("PI_SESSION_ID", "PI_SESSION_FILE") and not key.endswith(("_API_KEY", "_AUTH_TOKEN", "_OAUTH_TOKEN"))}
     env.update(PI_CODING_AGENT_DIR=str(config), PI_OFFLINE="1", PI_TELEMETRY="0",
-               AUTO_FOLD_SMOKE_DIR=str(directory), TERM="xterm-256color")
+               AUTO_FOLD_SMOKE_DIR=str(directory), PI_IMAGE_PROTOCOL="kitty", TERM="xterm-256color")
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     command = [PI, "--tui-mode", "fullscreen", "--offline", "--no-extensions", "--no-mcp", "--no-skills",
@@ -90,16 +100,17 @@ def run(directory):
         assert target.exists(), f"No {label} snapshot; terminal: {bytes(output[-3000:])!r}"
         result = json.loads(target.read_text())
         assert len(result["tools"]) == 2 and len(result["notices"]) == 1, result
-        assert "SMOKE FINAL" in str(result["finals"]), result
+        assert "SMOKE USER" in str(result["boundaries"]) and "SMOKE FINAL" in str(result["finals"]), result
         return result
 
     def collapsed(result):
-        assert len(result["summaries"]) == 1, result
+        assert len(result["summaries"]) == 1 and "2 项工具/命令" in result["summaries"][0], result
         assert all(not lines for lines in result["tools"] + result["notices"]), result
 
     def expanded(result):
         assert all("SMOKE TOOL" in str(lines) for lines in result["tools"]), result
-        assert "acp_delegate completed" in str(result["notices"]), result
+        assert any(png in line for line in result["tools"][0]), "Missing native image on expansion"
+        assert "acp_delegate completed" in str(result["notices"]) and "SIGTERM" in str(result["notices"]), result
 
     try:
         collapsed(snapshot("startup"))

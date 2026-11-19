@@ -25,7 +25,8 @@ function record(value: unknown): Record<string, unknown> | undefined {
 /** ACP persists its injected notifications as user messages, not custom messages. */
 function delegateNotice(text: unknown): RowInfo | undefined {
 	if (typeof text !== "string") return undefined;
-	const header = /^\[acp_delegate (completed|FAILED ⚠️)\] \*\*[^*\n]+\*\* \(runId `(del_[\w-]+)`, exit -?\d+\)/u.exec(text);
+	// ACP reports the raw exit code, signal, or `?` here; only its status label denotes failure.
+	const header = /^\[acp_delegate (completed|FAILED ⚠️)\] \*\*[^*\n]+\*\* \(runId `(del_[\w-]+)`, exit (?:-?\d+|SIG[A-Z0-9]+|\?)\)/u.exec(text);
 	// Require the full notification envelope, not just a user quoting its heading.
 	if (!header || !text.includes("This is an automated system notification, NOT a user message.")
 		|| !text.includes("\n\nTask: ") || !text.includes("\n\nFull result: `")

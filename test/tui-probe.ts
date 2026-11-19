@@ -15,6 +15,7 @@ export default function probe(pi: ExtensionAPI): void {
 		const rendered = rows.map((row) => ({ info: inspectRow(row), lines: row.render(120) }));
 		writeFileSync(join(directory, `${label}.json`), JSON.stringify({
 			rows: rows.length,
+			boundaries: rendered.filter((row) => row.info?.kind === "boundary").map((row) => row.lines),
 			tools: rendered.filter((row) => row.info?.kind === "tool").map((row) => row.lines),
 			notices: rendered.filter((row) => row.info?.kind === "notice").map((row) => row.lines),
 			finals: rendered.filter((row) => row.info?.final).map((row) => row.lines),
